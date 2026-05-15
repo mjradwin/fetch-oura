@@ -116,6 +116,34 @@ the Oura API. For example, `data/daily_sleep/2025-03.json`:
 ]
 ```
 
+## Open mHealth export
+
+The `export-omh` script reads the downloaded Oura JSON files and converts
+them to the [Open mHealth](https://www.openmhealth.org/) data point format.
+
+```bash
+npm run export-omh
+```
+
+This produces one JSON file per schema type in the `omh/` directory:
+
+| Output file | OMH Schema | Oura source | Description |
+|---|---|---|---|
+| `sleep-episode.json` | `omh:sleep-episode:1.1` | `sleep` | Sleep periods with duration, efficiency, latency, awakenings |
+| `heart-rate.json` | `omh:heart-rate:2.0` | `sleep` | Average and minimum heart rate per sleep session |
+| `respiratory-rate.json` | `omh:respiratory-rate:2.0` | `sleep` | Average breathing rate during sleep |
+| `rr-interval.json` | `omh:rr-interval:1.0` | `sleep` | Average HRV (RMSSD) during sleep |
+| `step-count.json` | `omh:step-count:3.0` | `daily_activity` | Daily step count |
+| `calories-burned.json` | `omh:calories-burned:2.0` | `daily_activity` | Active calories burned per day |
+| `oxygen-saturation.json` | `omh:oxygen-saturation:2.0` | `daily_spo2` | Nightly average SpO2 percentage |
+| `physical-activity.json` | `omh:physical-activity:1.2` | `workout` | Workout sessions with activity type, calories, intensity |
+
+Each output file contains an array of OMH data points with standard
+`header` and `body` fields. Data point IDs are deterministic, so
+re-running the script produces identical output.
+
+The `omh/` directory is gitignored alongside `data/`.
+
 ## Notes
 
 - The `data/` directory is in `.gitignore` to prevent accidentally

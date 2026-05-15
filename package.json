@@ -1,0 +1,25 @@
+{
+  "name": "fetch-oura",
+  "version": "1.0.0",
+  "description": "Fetch all Oura Ring data via the Oura API v2 and store as JSON",
+  "type": "module",
+  "engines": {
+    "node": ">= 24"
+  },
+  "scripts": {
+    "build": "tsc",
+    "test": "echo \"OK: no test specified\" && exit 0",
+    "start": "tsx src/fetch-oura.ts"
+  },
+  "author": "Michael J. Radwin (https://github.com/mjradwin)",
+  "license": "BSD-2-Clause",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mradwin/fetch-oura.git"
+  },
+  "devDependencies": {
+    "@types/node": "^25.8.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.7.0"
+  }
+}

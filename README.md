@@ -53,7 +53,8 @@ data/
 ```
 
 Re-running the tool skips months that have already been downloaded,
-so you can incrementally fetch new data.
+so you can incrementally fetch new data. Use `--month YYYY-MM` to
+re-fetch a single month.
 
 ## Prerequisites
 
@@ -98,6 +99,24 @@ npm start
 
 The tool will fetch 18 months of data across all endpoints and write
 JSON files to the `data/` directory (which is gitignored).
+
+### Fetching a single month
+
+To re-fetch data for a specific month (e.g. because new data has arrived
+this month), use the `--month` flag:
+
+```bash
+npm start -- --month 2026-05
+```
+
+This deletes any existing JSON files for that month before fetching, so
+the data is refreshed. All endpoints are fetched for the specified month.
+
+### Help
+
+```bash
+npm start -- --help
+```
 
 ## Output
 

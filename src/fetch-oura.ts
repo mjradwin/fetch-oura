@@ -1,12 +1,13 @@
 /// <reference types="node" />
-import { readFileSync, writeFileSync, mkdirSync, existsSync } from "node:fs";
+import { readFileSync, writeFileSync, mkdirSync, existsSync, unlinkSync } from "node:fs";
 import { join } from "node:path";
 import { homedir } from "node:os";
+import { parseArgs } from "node:util";
 
 const BASE_URL = "https://api.ouraring.com/v2/usercollection";
 const TOKEN_PATH = join(homedir(), ".config", "oura", "token");
 const DATA_DIR = join(process.cwd(), "data");
-const MONTHS_BACK = 18;
+const DEFAULT_MONTHS_BACK = 18;
 const REQUEST_DELAY_MS = 100;
 
 const DATE_ENDPOINTS = [
@@ -49,13 +50,75 @@ function formatDate(date: Date): string {
   return date.toISOString().slice(0, 10);
 }
 
-function getMonthRange(): Array<{ start: Date; end: Date; label: string }> {
+function printUsage(): void {
+  console.log(`Usage: tsx src/fetch-oura.ts [options]
+
+Fetch Oura Ring data via the API v2 and store as monthly JSON files.
+
+Options:
+  --month YYYY-MM   Fetch only a single month (re-fetches existing data)
+  --help            Show this help message
+
+When --month is specified, any existing JSON files for that month are
+deleted before fetching so the data is refreshed. Without --month,
+the last ${DEFAULT_MONTHS_BACK} months are fetched, skipping months
+that already have data on disk.
+
+The Oura API personal access token is read from:
+  ${TOKEN_PATH}
+
+Output directory:
+  ${DATA_DIR}`);
+}
+
+interface CliOptions {
+  month: string | null;
+}
+
+function parseCliArgs(): CliOptions {
+  const { values } = parseArgs({
+    options: {
+      month: { type: "string" },
+      help: { type: "boolean" },
+    },
+    strict: true,
+  });
+
+  if (values.help) {
+    printUsage();
+    process.exit(0);
+  }
+
+  if (values.month) {
+    if (!/^\d{4}-\d{2}$/.test(values.month)) {
+      console.error(`Error: --month must be in YYYY-MM format (got "${values.month}")`);
+      process.exit(1);
+    }
+  }
+
+  return { month: values.month ?? null };
+}
+
+function getMonthRange(singleMonth: string | null): Array<{ start: Date; end: Date; label: string }> {
   const now = new Date();
+
+  if (singleMonth) {
+    const [yearStr, monthStr] = singleMonth.split("-");
+    const year = parseInt(yearStr, 10);
+    const month = parseInt(monthStr, 10) - 1;
+    const start = new Date(year, month, 1);
+    const end = new Date(year, month + 1, 0);
+    if (end > now) {
+      end.setTime(now.getTime());
+    }
+    return [{ start, end, label: singleMonth }];
+  }
+
   const months: Array<{ start: Date; end: Date; label: string }> = [];
 
-  for (let i = MONTHS_BACK; i >= 0; i--) {
+  for (let i = DEFAULT_MONTHS_BACK; i >= 0; i--) {
     const start = new Date(now.getFullYear(), now.getMonth() - i, 1);
-    const end = new Date(start.getFullYear(), start.getMonth() + 1, 0); // last day of month
+    const end = new Date(start.getFullYear(), start.getMonth() + 1, 0);
 
     if (end > now) {
       end.setTime(now.getTime());
@@ -121,17 +184,27 @@ function writeData(dir: string, filename: string, data: unknown[]): void {
   writeFileSync(join(dir, filename), JSON.stringify(data, null, 2) + "\n");
 }
 
+function deleteIfExists(filepath: string): void {
+  if (existsSync(filepath)) {
+    unlinkSync(filepath);
+  }
+}
+
 async function fetchDateEndpoint(
   token: string,
   endpoint: string,
   start: Date,
   end: Date,
   label: string,
+  force: boolean,
 ): Promise<void> {
   const dir = join(DATA_DIR, endpoint);
   const filename = `${label}.json`;
+  const filepath = join(dir, filename);
 
-  if (existsSync(join(dir, filename))) {
+  if (force) {
+    deleteIfExists(filepath);
+  } else if (existsSync(filepath)) {
     console.log(`  skip ${endpoint}/${filename} (already exists)`);
     return;
   }
@@ -160,11 +233,15 @@ async function fetchDatetimeEndpoint(
   start: Date,
   end: Date,
   label: string,
+  force: boolean,
 ): Promise<void> {
   const dir = join(DATA_DIR, endpoint);
   const filename = `${label}.json`;
+  const filepath = join(dir, filename);
 
-  if (existsSync(join(dir, filename))) {
+  if (force) {
+    deleteIfExists(filepath);
+  } else if (existsSync(filepath)) {
     console.log(`  skip ${endpoint}/${filename} (already exists)`);
     return;
   }
@@ -215,26 +292,34 @@ async function fetchPersonalInfo(token: string): Promise<void> {
 }
 
 async function main(): Promise<void> {
+  const opts = parseCliArgs();
   const token = loadToken();
-  const months = getMonthRange();
+  const months = getMonthRange(opts.month);
+  const force = opts.month !== null;
 
-  console.log(`Fetching Oura data for ${months.length} months: ${months[0].label} to ${months[months.length - 1].label}`);
+  if (months.length === 1) {
+    console.log(`Fetching Oura data for ${months[0].label}`);
+  } else {
+    console.log(`Fetching Oura data for ${months.length} months: ${months[0].label} to ${months[months.length - 1].label}`);
+  }
   console.log(`Output directory: ${DATA_DIR}\n`);
 
-  console.log("Fetching personal_info...");
-  await fetchPersonalInfo(token);
-  await delay(REQUEST_DELAY_MS);
+  if (!force) {
+    console.log("Fetching personal_info...");
+    await fetchPersonalInfo(token);
+    await delay(REQUEST_DELAY_MS);
+  }
 
   for (const { start, end, label } of months) {
     console.log(`\n--- ${label} ---`);
 
     for (const endpoint of DATE_ENDPOINTS) {
-      await fetchDateEndpoint(token, endpoint, start, end, label);
+      await fetchDateEndpoint(token, endpoint, start, end, label, force);
       await delay(REQUEST_DELAY_MS);
     }
 
     for (const endpoint of DATETIME_ENDPOINTS) {
-      await fetchDatetimeEndpoint(token, endpoint, start, end, label);
+      await fetchDatetimeEndpoint(token, endpoint, start, end, label, force);
       await delay(REQUEST_DELAY_MS);
     }
   }

@@ -155,6 +155,36 @@ activity, and workout data; UTC for the all-day heart rate endpoint).
 
 The `omh/` directory is gitignored alongside `data/`.
 
+## Open mHealth export (DSR)
+
+If you have a GDPR/CCPA data subject request (DSR) export from Oura,
+the `export-omh-dsr` script converts the CSV files that contain data
+not available through the API into Open mHealth format.
+
+Place your DSR export in the `dsr-request/` directory (with `App Data/`
+and `Subscriptions/` subdirectories), then run:
+
+```bash
+npm run export-omh-dsr
+```
+
+This exports 4 data sources unique to the DSR that aren't covered by
+the API-based exporter:
+
+| Output file | OMH Schema | DSR source | Description |
+|---|---|---|---|
+| `blood-glucose.json` | `omh:blood-glucose:3.0` | `bloodglucose.csv` | Blood glucose readings in mg/dL |
+| `skin-temperature.json` | `omh:body-temperature:4.0` | `temperature.csv` | Raw wrist skin temperature in °C |
+| `food-log.json` | `custom:food-log:1.0` | `meal.csv` + `fooditem.csv` | Meal logging with food items and nutrition details |
+| `daytime-stress.json` | `custom:stress-level:1.0` | `daytimestress.csv` | Time-series stress and recovery values |
+
+The remaining DSR CSV files (heartrate, sleep, daily activity, etc.)
+duplicate data already available from the API and are not re-exported.
+
+Output goes to the same `omh/` directory. Sensor timestamps (blood
+glucose, temperature, stress) are UTC; meal timestamps preserve local
+timezone offsets.
+
 ## Notes
 
 - The `data/` directory is in `.gitignore` to prevent accidentally

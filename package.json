@@ -10,7 +10,8 @@
     "build": "tsc",
     "test": "echo \"OK: no test specified\" && exit 0",
     "start": "tsx src/fetch-oura.ts",
-    "export-omh": "tsx src/export-omh.ts"
+    "export-omh": "tsx src/export-omh.ts",
+    "export-omh-dsr": "tsx src/export-omh-dsr.ts"
   },
   "author": "Michael J. Radwin (https://github.com/mjradwin)",
   "license": "BSD-2-Clause",

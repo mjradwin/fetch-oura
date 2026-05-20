@@ -24,6 +24,7 @@ The tool fetches 18 months of data across all available API endpoints:
 | `enhanced_tag` | Enhanced tags |
 | `heartrate` | Heart rate time-series (5-second intervals) |
 | `interbeat_interval` | Raw IBI data (requires research scope) |
+| `temperature` | Skin temperature data (requires research scope) |
 | `personal_info` | User profile |
 | `rest_mode_period` | Rest mode episodes |
 | `ring_configuration` | Ring hardware info |
@@ -130,17 +131,27 @@ This produces one JSON file per schema type in the `omh/` directory:
 | Output file | OMH Schema | Oura source | Description |
 |---|---|---|---|
 | `sleep-episode.json` | `omh:sleep-episode:1.1` | `sleep` | Sleep periods with duration, efficiency, latency, awakenings |
-| `heart-rate.json` | `omh:heart-rate:2.0` | `sleep` | Average and minimum heart rate per sleep session |
+| `sleep-stage.json` | `custom:sleep-stage:1.0` | `sleep` | Time-windowed sleep stages (deep/light/rem/awake) decoded from `sleep_phase_5_min` |
+| `heart-rate-sleep.json` | `omh:heart-rate:2.0` | `sleep` | Per-5-minute and summary (avg/min) heart rate during sleep |
+| `heart-rate-allday.json` | `omh:heart-rate:2.0` | `heartrate` | All-day heart rate with activity/sleep context |
+| `heart-rate-session.json` | `omh:heart-rate:2.0` | `session` | Per-interval heart rate during meditation/rest sessions |
 | `respiratory-rate.json` | `omh:respiratory-rate:2.0` | `sleep` | Average breathing rate during sleep |
-| `rr-interval.json` | `omh:rr-interval:1.0` | `sleep` | Average HRV (RMSSD) during sleep |
+| `rr-interval-sleep.json` | `omh:rr-interval:1.0` | `sleep` | Per-5-minute and summary HRV (RMSSD) during sleep |
+| `rr-interval-session.json` | `omh:rr-interval:1.0` | `session` | Per-interval HRV during meditation/rest sessions |
+| `body-temperature.json` | `omh:body-temperature:4.0` | `sleep` | Wrist temperature deviation during sleep |
 | `step-count.json` | `omh:step-count:3.0` | `daily_activity` | Daily step count |
-| `calories-burned.json` | `omh:calories-burned:2.0` | `daily_activity` | Active calories burned per day |
+| `calories-burned.json` | `omh:calories-burned:2.0` | `daily_activity` | Active and total calories burned per day |
+| `minutes-moderate-activity.json` | `omh:minutes-moderate-activity:1.0` | `daily_activity` | Daily moderate-intensity activity minutes |
 | `oxygen-saturation.json` | `omh:oxygen-saturation:2.0` | `daily_spo2` | Nightly average SpO2 percentage |
 | `physical-activity.json` | `omh:physical-activity:1.2` | `workout` | Workout sessions with activity type, calories, intensity |
+| `body-weight.json` | `omh:body-weight:3.0` | `personal_info` | Body weight in kg |
+| `body-height.json` | `omh:body-height:2.0` | `personal_info` | Body height in meters |
 
 Each output file contains an array of OMH data points with standard
 `header` and `body` fields. Data point IDs are deterministic, so
-re-running the script produces identical output.
+re-running the script produces identical output. Timestamps preserve
+the timezone offset from the original Oura data (local time for sleep,
+activity, and workout data; UTC for the all-day heart rate endpoint).
 
 The `omh/` directory is gitignored alongside `data/`.
 
@@ -151,9 +162,10 @@ The `omh/` directory is gitignored alongside `data/`.
 - The `heartrate` endpoint returns high-volume data (~30,000-50,000
   records per month). Total data size is typically around 100 MB for
   18 months.
-- The `interbeat_interval` endpoint requires a research-scope OAuth
-  token, which is not available to regular applications. The tool
-  will silently skip it if your token lacks this scope.
+- The `interbeat_interval` and `temperature` endpoints require a
+  research-scope OAuth token, which is not available to regular
+  applications. The tool will silently skip them if your token
+  lacks this scope.
 - The Oura API rate limit is 5,000 requests per 5 minutes. The tool
   adds a small delay between requests as a courtesy.
 

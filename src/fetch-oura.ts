@@ -32,6 +32,7 @@ const DATE_ENDPOINTS = [
 const DATETIME_ENDPOINTS = [
   "heartrate",
   "interbeat_interval", // requires research scope OAuth token
+  "temperature", // requires research scope OAuth token
 ];
 
 function loadToken(): string {

@@ -247,7 +247,7 @@ function convertBodyTemperature(records: SleepRecord[]): OmhDataPoint[] {
             end_date_time: r.bedtime_end,
           },
         },
-        measurement_location: "wrist",
+        measurement_location: "finger",
         descriptive_statistic: "average",
         temporal_relationship_to_sleep: "during sleep",
       },

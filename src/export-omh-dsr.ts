@@ -95,7 +95,7 @@ function convertSkinTemperature(rows: Record<string, string>[]): OmhDataPoint[] 
           unit: "C",
         },
         effective_time_frame: { date_time: r.timestamp },
-        measurement_location: "wrist",
+        measurement_location: "finger",
       },
     }));
 }

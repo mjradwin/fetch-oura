@@ -192,7 +192,7 @@ the API-based exporter:
 
 | Output file | OMH Schema | DSR source | Description |
 |---|---|---|---|
-| `blood-glucose.json` | `omh:blood-glucose:3.0` | `bloodglucose.csv` | Blood glucose readings in mg/dL |
+| `blood-glucose.json` | `omh:blood-glucose:4.0` | `bloodglucose.csv` | Blood glucose readings in mg/dL |
 | `skin-temperature.json` | `omh:body-temperature:4.0` | `temperature.csv` | Raw wrist skin temperature in °C |
 | `food-log.json` | `custom:food-log:1.0` | `meal.csv` + `fooditem.csv` | Meal logging with food items and nutrition details |
 | `daytime-stress.json` | `custom:stress-level:1.0` | `daytimestress.csv` | Time-series stress and recovery values |

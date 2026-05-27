@@ -73,7 +73,7 @@ function convertBloodGlucose(rows: Record<string, string>[]): OmhDataPoint[] {
   return rows
     .filter((r) => r.timestamp && r.value)
     .map((r) => ({
-      header: makeHeader("blood-glucose", "3.0", r.timestamp),
+      header: makeHeader("blood-glucose", "4.0", r.timestamp),
       body: {
         blood_glucose: {
           value: parseFloat(r.value),

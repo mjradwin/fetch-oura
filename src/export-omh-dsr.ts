@@ -81,21 +81,22 @@ function convertBloodGlucose(rows: Record<string, string>[]): Record<string, unk
 }
 
 function convertSkinTemperature(rows: Record<string, string>[]): Record<string, unknown>[] {
-  const hourly = new Map<string, number[]>();
+  const BUCKET_MS = 5 * 60 * 1000;
+  const buckets = new Map<number, number[]>();
   for (const r of rows) {
     if (!r.timestamp || !r.skin_temp) continue;
-    const hourKey = r.timestamp.slice(0, 13) + ":00:00.000Z";
-    let group = hourly.get(hourKey);
+    const ms = new Date(r.timestamp).getTime();
+    const key = Math.floor(ms / BUCKET_MS) * BUCKET_MS;
+    let group = buckets.get(key);
     if (!group) {
       group = [];
-      hourly.set(hourKey, group);
+      buckets.set(key, group);
     }
     group.push(parseFloat(r.skin_temp));
   }
   const points: Record<string, unknown>[] = [];
-  for (const [hourStart, values] of hourly) {
+  for (const [startMs, values] of buckets) {
     const avg = values.reduce((a, b) => a + b, 0) / values.length;
-    const hourEnd = new Date(new Date(hourStart).getTime() + 3_600_000).toISOString();
     points.push({
       body_temperature: {
         value: Math.round(avg * 100) / 100,
@@ -103,8 +104,8 @@ function convertSkinTemperature(rows: Record<string, string>[]): Record<string, 
       },
       effective_time_frame: {
         time_interval: {
-          start_date_time: hourStart,
-          end_date_time: hourEnd,
+          start_date_time: new Date(startMs).toISOString(),
+          end_date_time: new Date(startMs + BUCKET_MS).toISOString(),
         },
       },
       measurement_location: "finger",

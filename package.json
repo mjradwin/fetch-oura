@@ -1,6 +1,6 @@
 {
   "name": "fetch-oura",
-  "version": "1.5.0",
+  "version": "1.5.1",
   "description": "Fetch all Oura Ring data via the Oura API v2 and store as JSON",
   "type": "module",
   "engines": {

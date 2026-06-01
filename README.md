@@ -139,7 +139,11 @@ the Oura API. For example, `data/daily_sleep/2025-03.json`:
 ## Open mHealth export
 
 The `export-omh` script reads the downloaded Oura JSON files and converts
-them to the [Open mHealth](https://www.openmhealth.org/) data point format.
+them to the [IEEE 1752.1](https://opensource.ieee.org/omh/1752)
+[data-series](https://w3id.org/ieee/ieee-1752-schema/data-series.json)
+format, which extends [Open mHealth](https://www.openmhealth.org/) with
+a compact envelope: one shared header per file and an array of body
+measurements.
 
 ```bash
 npm run export-omh
@@ -147,17 +151,17 @@ npm run export-omh
 
 This produces one JSON file per schema type in the `omh/` directory:
 
-| Output file | OMH Schema | Oura source | Description |
+| Output file | Schema | Oura source | Description |
 |---|---|---|---|
 | `sleep-episode.json` | `omh:sleep-episode:1.1` | `sleep` | Sleep periods with duration, efficiency, latency, awakenings |
-| `sleep-stage.json` | `custom:sleep-stage:1.0` | `sleep` | Time-windowed sleep stages (deep/light/rem/awake) decoded from `sleep_phase_5_min` |
+| `sleep-stage.json` | `ieee:sleep-stage-summary:1.0` | `sleep` | Per-episode sleep stage summary and individual stage episodes |
 | `heart-rate-sleep.json` | `omh:heart-rate:2.0` | `sleep` | Per-5-minute and summary (avg/min) heart rate during sleep |
 | `heart-rate-allday.json` | `omh:heart-rate:2.0` | `heartrate` | All-day heart rate with activity/sleep context |
 | `heart-rate-session.json` | `omh:heart-rate:2.0` | `session` | Per-interval heart rate during meditation/rest sessions |
 | `respiratory-rate.json` | `omh:respiratory-rate:2.0` | `sleep` | Average breathing rate during sleep |
 | `rr-interval-sleep.json` | `omh:rr-interval:1.0` | `sleep` | Per-5-minute and summary HRV (RMSSD) during sleep |
 | `rr-interval-session.json` | `omh:rr-interval:1.0` | `session` | Per-interval HRV during meditation/rest sessions |
-| `body-temperature.json` | `omh:body-temperature:4.0` | `sleep` | Wrist temperature deviation during sleep |
+| `body-temperature.json` | `omh:body-temperature:4.0` | `sleep` | Finger temperature deviation during sleep |
 | `step-count.json` | `omh:step-count:3.0` | `daily_activity` | Daily step count |
 | `calories-burned.json` | `omh:calories-burned:2.0` | `daily_activity` | Active and total calories burned per day |
 | `minutes-moderate-activity.json` | `omh:minutes-moderate-activity:1.0` | `daily_activity` | Daily moderate-intensity activity minutes |
@@ -166,9 +170,11 @@ This produces one JSON file per schema type in the `omh/` directory:
 | `body-weight.json` | `omh:body-weight:3.0` | `personal_info` | Body weight in kg |
 | `body-height.json` | `omh:body-height:2.0` | `personal_info` | Body height in meters |
 
-Each output file contains an array of OMH data points with standard
-`header` and `body` fields. Data point IDs are deterministic, so
-re-running the script produces identical output. Timestamps preserve
+Each output file is an IEEE 1752.1 data-series with a single
+[header](https://w3id.org/ieee/ieee-1752-schema/header.json)
+(`uuid`, `schema_id`, `source_creation_date_time`, `modality`) and
+a `body` array of measurement objects. Header UUIDs are derived from
+the source Oura record IDs for reproducible output. Timestamps preserve
 the timezone offset from the original Oura data (local time for sleep,
 activity, and workout data; UTC for the all-day heart rate endpoint).
 
@@ -178,7 +184,7 @@ The `omh/` directory is gitignored alongside `data/`.
 
 If you have a GDPR/CCPA data subject request (DSR) export from Oura,
 the `export-omh-dsr` script converts the CSV files that contain data
-not available through the API into Open mHealth format.
+not available through the API into the same IEEE 1752.1 data-series format.
 
 Place your DSR export in the `dsr-request/` directory (with `App Data/`
 and `Subscriptions/` subdirectories), then run:
@@ -190,10 +196,10 @@ npm run export-omh-dsr
 This exports 4 data sources unique to the DSR that aren't covered by
 the API-based exporter:
 
-| Output file | OMH Schema | DSR source | Description |
+| Output file | Schema | DSR source | Description |
 |---|---|---|---|
 | `blood-glucose.json` | `omh:blood-glucose:4.0` | `bloodglucose.csv` | Blood glucose readings in mg/dL |
-| `skin-temperature.json` | `omh:body-temperature:4.0` | `temperature.csv` | Raw wrist skin temperature in °C |
+| `skin-temperature.json` | `omh:body-temperature:4.0` | `temperature.csv` | 5-minute average skin temperature in °C |
 | `food-log.json` | `custom:food-log:1.0` | `meal.csv` + `fooditem.csv` | Meal logging with food items and nutrition details |
 | `daytime-stress.json` | `custom:stress-level:1.0` | `daytimestress.csv` | Time-series stress and recovery values |
 

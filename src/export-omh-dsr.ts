@@ -1,8 +1,7 @@
 /// <reference types="node" />
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { ensureOutDir, makeHeader, writeOutput } from "./omh-utils.js";
-import type { OmhDataPoint } from "./omh-utils.js";
+import { ensureOutDir, writeOutput } from "./omh-utils.js";
 
 const DSR_DIR = join(process.cwd(), "dsr-request", "App Data");
 
@@ -69,35 +68,50 @@ function parseCsvLine(line: string): string[] {
 
 // --- Converters ---
 
-function convertBloodGlucose(rows: Record<string, string>[]): OmhDataPoint[] {
+function convertBloodGlucose(rows: Record<string, string>[]): Record<string, unknown>[] {
   return rows
     .filter((r) => r.timestamp && r.value)
     .map((r) => ({
-      header: makeHeader("blood-glucose", "4.0", r.timestamp),
-      body: {
-        blood_glucose: {
-          value: parseFloat(r.value),
-          unit: "mg/dL",
-        },
-        effective_time_frame: { date_time: r.timestamp },
+      blood_glucose: {
+        value: parseFloat(r.value),
+        unit: "mg/dL",
       },
+      effective_time_frame: { date_time: r.timestamp },
     }));
 }
 
-function convertSkinTemperature(rows: Record<string, string>[]): OmhDataPoint[] {
-  return rows
-    .filter((r) => r.timestamp && r.skin_temp)
-    .map((r) => ({
-      header: makeHeader("body-temperature", "4.0", r.timestamp, "skin"),
-      body: {
-        body_temperature: {
-          value: parseFloat(r.skin_temp),
-          unit: "C",
-        },
-        effective_time_frame: { date_time: r.timestamp },
-        measurement_location: "finger",
+function convertSkinTemperature(rows: Record<string, string>[]): Record<string, unknown>[] {
+  const hourly = new Map<string, number[]>();
+  for (const r of rows) {
+    if (!r.timestamp || !r.skin_temp) continue;
+    const hourKey = r.timestamp.slice(0, 13) + ":00:00.000Z";
+    let group = hourly.get(hourKey);
+    if (!group) {
+      group = [];
+      hourly.set(hourKey, group);
+    }
+    group.push(parseFloat(r.skin_temp));
+  }
+  const points: Record<string, unknown>[] = [];
+  for (const [hourStart, values] of hourly) {
+    const avg = values.reduce((a, b) => a + b, 0) / values.length;
+    const hourEnd = new Date(new Date(hourStart).getTime() + 3_600_000).toISOString();
+    points.push({
+      body_temperature: {
+        value: Math.round(avg * 100) / 100,
+        unit: "C",
       },
-    }));
+      effective_time_frame: {
+        time_interval: {
+          start_date_time: hourStart,
+          end_date_time: hourEnd,
+        },
+      },
+      measurement_location: "finger",
+      descriptive_statistic: "average",
+    });
+  }
+  return points;
 }
 
 interface FoodItem {
@@ -108,7 +122,7 @@ interface FoodItem {
 function convertFoodLog(
   mealRows: Record<string, string>[],
   foodItemMap: Map<string, FoodItem>,
-): OmhDataPoint[] {
+): Record<string, unknown>[] {
   return mealRows
     .filter((r) => r.id && r.start_time)
     .map((r) => {
@@ -132,31 +146,25 @@ function convertFoodLog(
         } catch { /* ignore */ }
       }
       return {
-        header: makeHeader("food-log", "1.0", r.id, "", "custom"),
-        body: {
-          meal_name: r.name || undefined,
-          meal_type: r.type || undefined,
-          effective_time_frame: { date_time: r.start_time },
-          ...(r.weight && {
-            total_weight: { value: parseFloat(r.weight), unit: "g" },
-          }),
-          ...(foodItems.length > 0 && { food_items: foodItems }),
-          ...(nutrition && { nutrition_per_100g: nutrition }),
-        },
+        meal_name: r.name || undefined,
+        meal_type: r.type || undefined,
+        effective_time_frame: { date_time: r.start_time },
+        ...(r.weight && {
+          total_weight: { value: parseFloat(r.weight), unit: "g" },
+        }),
+        ...(foodItems.length > 0 && { food_items: foodItems }),
+        ...(nutrition && { nutrition_per_100g: nutrition }),
       };
     });
 }
 
-function convertDaytimeStress(rows: Record<string, string>[]): OmhDataPoint[] {
+function convertDaytimeStress(rows: Record<string, string>[]): Record<string, unknown>[] {
   return rows
     .filter((r) => r.timestamp && (r.stress_value || r.recovery_value))
     .map((r) => ({
-      header: makeHeader("stress-level", "1.0", r.timestamp, "", "custom"),
-      body: {
-        ...(r.stress_value && { stress_value: parseInt(r.stress_value, 10) }),
-        ...(r.recovery_value && { recovery_value: parseInt(r.recovery_value, 10) }),
-        effective_time_frame: { date_time: r.timestamp },
-      },
+      ...(r.stress_value && { stress_value: parseInt(r.stress_value, 10) }),
+      ...(r.recovery_value && { recovery_value: parseInt(r.recovery_value, 10) }),
+      effective_time_frame: { date_time: r.timestamp },
     }));
 }
 
@@ -188,10 +196,10 @@ function main(): void {
   const foodItemMap = loadFoodItemMap(foodItemRows);
   console.log(`\nExporting to omh/\n`);
 
-  writeOutput("blood-glucose", convertBloodGlucose(bloodGlucoseRows));
-  writeOutput("skin-temperature", convertSkinTemperature(temperatureRows));
-  writeOutput("food-log", convertFoodLog(mealRows, foodItemMap));
-  writeOutput("daytime-stress", convertDaytimeStress(stressRows));
+  writeOutput("blood-glucose", "blood-glucose", "4.0", convertBloodGlucose(bloodGlucoseRows), { sourceId: bloodGlucoseRows[0]?.timestamp });
+  writeOutput("skin-temperature", "body-temperature", "4.0", convertSkinTemperature(temperatureRows), { sourceId: temperatureRows[0]?.timestamp });
+  writeOutput("food-log", "food-log", "1.0", convertFoodLog(mealRows, foodItemMap), { namespace: "custom", sourceId: mealRows[0]?.id });
+  writeOutput("daytime-stress", "stress-level", "1.0", convertDaytimeStress(stressRows), { namespace: "custom", sourceId: stressRows[0]?.timestamp });
 
   console.log("\nDone!");
 }
